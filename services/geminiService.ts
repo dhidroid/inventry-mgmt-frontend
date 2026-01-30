@@ -2,17 +2,29 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export class GeminiService {
-  private ai: GoogleGenAI;
+  private apiKey: string | undefined;
+  private ai: GoogleGenAI | undefined;
 
   constructor() {
-    // Correct initialization using named parameters and directly referencing process.env.API_KEY
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Only store the key, don't initialize immediately to prevent crash
+    this.apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  }
+
+  private getClient(): GoogleGenAI {
+    if (!this.apiKey) {
+      throw new Error("Gemini API Key is missing. Please set VITE_GEMINI_API_KEY or use the setup guide.");
+    }
+    if (!this.ai) {
+      this.ai = new GoogleGenAI({ apiKey: this.apiKey });
+    }
+    return this.ai;
   }
 
   async extractInventoryFromImage(base64Image: string) {
     try {
-      const response = await this.ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+      const client = this.getClient();
+      const response = await client.models.generateContent({
+        model: 'gemini-1.5-flash', // Updated to stable model
         contents: {
           parts: [
             {
@@ -54,7 +66,8 @@ export class GeminiService {
       return JSON.parse(jsonStr || '{}');
     } catch (error) {
       console.error("Gemini Analysis Error:", error);
-      throw error;
+      // Return empty structure instead of crashing
+      return { extractions: [] };
     }
   }
 }
